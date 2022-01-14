@@ -1,0 +1,5 @@
+---
+# tasks file for webserver
+- include_tasks: install_apache.yml
+- include_tasks: start_apache.yml
+- include_tasks: deploy_file.yml 

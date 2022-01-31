@@ -1,4 +1,7 @@
-web1 ansible_host=3.129.12.141
-
+web1 ansible_host=52.14.40.138
 [web_servers]
 web1
+ec2-user@172.31.21.4
+ec2-user@172.31.25.3
+
+

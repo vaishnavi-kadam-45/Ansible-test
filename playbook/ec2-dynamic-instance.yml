@@ -1,0 +1,84 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Launch Instance
+      ec2:
+        key_name: "mykey"
+        aws_access_key: "AKIAY7IIJS5SZLEAL5NW"
+        aws_secret_key: "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"
+        group: "launch-wizard-1"
+        instance_type: "t2.micro"
+        image: "ami-001089eb624938d9f"
+        wait: true
+        region: "us-east-2"
+        count: 1
+        count_tag:
+          Name: "Automatic"
+        instance_tags:
+          Name: "Automatic"
+        vpc_subnet_id: "subnet-08bb0639aa5034f10"
+        assign_public_ip: yes
+      register: ec2
+
+    - name: Add instances to host group
+      add_host:
+        hostname: "{{ item.private_ip}}"
+        groups:
+          - web_servers
+      with_items: "{{ ec2.instances }}"
+
+    - debug:
+        msg: Remote IP is "{{ item.private_ip }}"
+      with_items: "{{ ec2.instances }}"
+
+    - name: Add in inventory file
+      lineinfile:
+        path: /home/ec2-user/ansible-demo/hosts
+        insertafter: '^[web_servers]'
+        line: "ec2-user@{{ item.private_ip }}"
+      with_items: "{{ ec2.instances }}"
+
+    - pause: 
+        prompt: Waiting for 1 minute
+        minutes: 1
+
+    - name: Install python
+      shell:
+        ssh -i key.pem ec2-user@{{ item.private_ip }}
+        sudo yum update -y && sudo yum install python -y
+      with_items: "{{ ec2.instances }}"
+
+    - name: Install git
+      shell:
+        ssh -i key.pem ec2-user@{{ item.private_ip }}
+        sudo yum install git -y
+      with_items: "{{ ec2.instances }}"
+
+    - name: export SSH key
+      shell: cat ~/.ssh/id_rsa.pub | ssh -i key.pem ec2-user@{{ item.private_ip }} "cat >> ~/.ssh/authorized_keys"
+      become_user: ec2-user
+      delegate_to: localhost
+      with_items: "{{ ec2.instances }}"
+
+    - name: Refresh Inventory
+      meta: refresh_inventory
+
+- name: Configure Instance
+  hosts: web_servers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install Apache
+      yum: name=httpd state=present
+
+    - name: Start apache
+      service: name=httpd state=started
+
+    - name: Deploye application
+      git:
+        repo: https://github.com/vaishnavi-kadam-45/Ansible-test.git
+        dest: /var/www/html
+        update: yes
+        force: yes
+
